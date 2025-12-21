@@ -86,12 +86,15 @@ structure CustomSpec where
   measure : Float → Float → (Float × Float)
   /-- Collect render commands given computed layout. -/
   collect : Trellis.ComputedLayout → RenderCommands
+  /-- Optional custom hit test (true if point is inside widget). -/
+  hitTest : Option (Trellis.ComputedLayout → Point → Bool) := none
 
 namespace CustomSpec
 
 def default : CustomSpec :=
   { measure := fun _ _ => (0, 0)
-    collect := fun _ => #[] }
+    collect := fun _ => #[]
+    hitTest := none }
 
 end CustomSpec
 

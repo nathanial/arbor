@@ -52,8 +52,14 @@ where
     let adjX := x + scrollOffset.x
     let adjY := y + scrollOffset.y
 
-    -- Check if point is within this widget's bounds
-    if !layout.borderRect.contains adjX adjY then
+    -- Check if point is within this widget's bounds (custom widgets may override hit test)
+    let inside := match w with
+      | .custom _ _ _ spec =>
+          match spec.hitTest with
+          | some hit => hit layout ⟨adjX, adjY⟩
+          | none => layout.borderRect.contains adjX adjY
+      | _ => layout.borderRect.contains adjX adjY
+    if !inside then
       none
 
     let currentPath := path.push w.id
@@ -111,7 +117,13 @@ where
       let adjX := x + scrollOffset.x
       let adjY := y + scrollOffset.y
 
-      if !layout.borderRect.contains adjX adjY then
+      let inside := match w with
+        | .custom _ _ _ spec =>
+            match spec.hitTest with
+            | some hit => hit layout ⟨adjX, adjY⟩
+            | none => layout.borderRect.contains adjX adjY
+        | _ => layout.borderRect.contains adjX adjY
+      if !inside then
         #[]
       else
         let currentPath := path.push w.id
