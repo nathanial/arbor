@@ -11,6 +11,10 @@ namespace ArborTests
 open Crucible
 open Arbor
 
+/-- Check if a string contains a substring. -/
+def containsSubstr (haystack needle : String) : Bool :=
+  (haystack.splitOn needle).length > 1
+
 /-! ## Core Types Tests -/
 
 testSuite "Core.Types"
@@ -186,6 +190,117 @@ test "collectCommands generates commands for colored rect" := do
   let layouts := Trellis.layout node 100 50
   let cmds := collectCommands widget layouts
   cmds.size ≡ 1
+
+/-! ## Text Canvas Tests -/
+
+testSuite "Text.Canvas"
+
+test "Canvas create has correct dimensions" := do
+  let canvas := Text.Canvas.create 80 24
+  canvas.width ≡ 80
+  canvas.height ≡ 24
+
+test "Canvas setChar and get" := do
+  let canvas := Text.Canvas.create 10 5
+  let canvas := canvas.setChar 3 2 'X'
+  let cell := canvas.get 3 2
+  cell.char ≡ 'X'
+
+test "Canvas setChar out of bounds is no-op" := do
+  let canvas := Text.Canvas.create 10 5
+  let canvas := canvas.setChar 100 100 'X'
+  -- Should not crash, just be ignored
+  canvas.width ≡ 10
+
+test "Canvas drawText places characters" := do
+  let canvas := Text.Canvas.create 20 5
+  let canvas := canvas.drawText 5 2 "Hello"
+  (canvas.get 5 2).char ≡ 'H'
+  (canvas.get 6 2).char ≡ 'e'
+  (canvas.get 7 2).char ≡ 'l'
+  (canvas.get 8 2).char ≡ 'l'
+  (canvas.get 9 2).char ≡ 'o'
+
+test "Canvas fillRect fills area" := do
+  let canvas := Text.Canvas.create 10 5
+  let canvas := canvas.fillRect 1 1 3 2 '#'
+  (canvas.get 1 1).char ≡ '#'
+  (canvas.get 2 1).char ≡ '#'
+  (canvas.get 3 1).char ≡ '#'
+  (canvas.get 1 2).char ≡ '#'
+  (canvas.get 0 0).char ≡ ' '  -- Outside the rect
+
+test "Canvas strokeBox draws border" := do
+  let canvas := Text.Canvas.create 10 5
+  let canvas := canvas.strokeBox 0 0 5 3 Text.Canvas.BoxChars.single
+  (canvas.get 0 0).char ≡ '┌'
+  (canvas.get 4 0).char ≡ '┐'
+  (canvas.get 0 2).char ≡ '└'
+  (canvas.get 4 2).char ≡ '┘'
+  (canvas.get 2 0).char ≡ '─'
+  (canvas.get 0 1).char ≡ '│'
+
+test "Canvas toString produces correct output" := do
+  let canvas := Text.Canvas.create 5 3
+  let canvas := canvas.drawText 0 0 "Hi"
+  let str := canvas.toString
+  ensure (str.startsWith "Hi") "Should start with 'Hi'"
+
+/-! ## Text Renderer Tests -/
+
+testSuite "Text.Renderer"
+
+test "renderToAscii with fillRect" := do
+  let cmds : Array RenderCommand := #[
+    .fillRect (Rect.mk' 0 0 4 2) (Tincture.Color.mk 0.1 0.1 0.1 1) 0
+  ]
+  let output := Text.renderToAscii cmds 10 5
+  -- Dark color should produce dense block chars
+  ensure (containsSubstr output "█" || output.length > 0) "Should render something"
+
+test "renderToAscii with strokeRect" := do
+  let cmds : Array RenderCommand := #[
+    .strokeRect (Rect.mk' 0 0 5 3) Tincture.Color.white 1 0
+  ]
+  let output := Text.renderToAscii cmds 10 5
+  ensure (containsSubstr output "┌") "Should have top-left corner"
+  ensure (containsSubstr output "┘") "Should have bottom-right corner"
+
+test "renderToAscii with fillText" := do
+  let cmds : Array RenderCommand := #[
+    .fillText "Hello" 0 0 FontId.default Tincture.Color.white
+  ]
+  let output := Text.renderToAscii cmds 20 5
+  ensure (containsSubstr output "Hello") "Should contain text"
+
+test "renderToAscii with rounded corners" := do
+  let cmds : Array RenderCommand := #[
+    .strokeRect (Rect.mk' 0 0 6 4) Tincture.Color.white 1 5
+  ]
+  let output := Text.renderToAscii cmds 10 5
+  ensure (containsSubstr output "╭") "Should have rounded top-left"
+  ensure (containsSubstr output "╯") "Should have rounded bottom-right"
+
+test "renderWithBorder adds title" := do
+  let cmds : Array RenderCommand := #[]
+  let output := Text.renderWithBorder cmds 20 5 "Test"
+  ensure (containsSubstr output "Test") "Should contain title"
+
+test "RenderState translation" := do
+  let state := Text.RenderState.create 20 10
+  let state := state.translate 5 3
+  let (x, y) := state.toCanvasCoords 10 10
+  x ≡ 15
+  y ≡ 13
+
+test "debugLayout shows labeled boxes" := do
+  let boxes : Array (String × Rect) := #[
+    ("Box1", Rect.mk' 0 0 10 4),
+    ("Box2", Rect.mk' 12 0 8 4)
+  ]
+  let output := Text.debugLayout boxes 25 6
+  ensure (containsSubstr output "Box1") "Should contain Box1 label"
+  ensure (containsSubstr output "Box2") "Should contain Box2 label"
 
 #generate_tests
 

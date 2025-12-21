@@ -35,3 +35,7 @@ import Arbor.Widget.Measure
 import Arbor.Event.Types
 import Arbor.Event.HitTest
 import Arbor.Event.Scroll
+
+-- Text-based rendering (for debugging/testing)
+import Arbor.Text.Canvas
+import Arbor.Text.Renderer
