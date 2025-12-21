@@ -4,6 +4,7 @@
   Useful for debugging, testing, and terminal output.
 -/
 import Arbor.Text.Canvas
+import Arbor.Text.Mode
 import Arbor.Render.Command
 import Arbor.Render.Collect
 import Arbor.Widget.Core
@@ -14,6 +15,11 @@ import Trellis
 namespace Arbor.Text
 
 open Arbor
+
+/-- Pad a string on the right with spaces to reach the given width. -/
+def padRight (s : String) (width : Nat) : String :=
+  if s.length >= width then s
+  else s ++ String.ofList (List.replicate (width - s.length) ' ')
 
 /-- Render state for tracking transforms and clips. -/
 structure RenderState where
@@ -286,5 +292,343 @@ def renderWidgetWithBorder (widget : Widget) (width height : Nat)
   let layouts := Trellis.layout layoutNode (width - 2).toFloat (height - 2).toFloat
   let cmds := collectCommands measuredWidget layouts
   renderWithBorder cmds width height title chars
+
+/-! ## Debug Rendering - WidgetInfo Collection -/
+
+/-- Metadata about a widget for debug output. -/
+structure WidgetInfo where
+  /-- Widget's unique identifier. -/
+  id : WidgetId
+  /-- Optional semantic name. -/
+  name : Option String
+  /-- Widget type as string (flex, grid, text, rect, scroll, spacer). -/
+  widgetType : String
+  /-- Container variant (row/column for flex, column count for grid). -/
+  containerVariant : Option String
+  /-- Computed layout rectangle. -/
+  rect : Trellis.LayoutRect
+  /-- Depth in widget tree (0 = root). -/
+  depth : Nat
+  /-- Parent widget ID if not root. -/
+  parentId : Option WidgetId
+  /-- Text content for text widgets. -/
+  textContent : Option String
+  /-- Style summary string. -/
+  styleInfo : Option String
+  /-- Number of children. -/
+  childCount : Nat
+deriving Repr, Inhabited
+
+namespace WidgetInfo
+
+/-- Format widget label like "[0]", "[header]", or "[0:header]". -/
+def formatLabel (info : WidgetInfo) (showId : Bool := true) : String :=
+  match info.name, showId with
+  | some n, true => s!"[{info.id}:{n}]"
+  | some n, false => s!"[{n}]"
+  | none, _ => s!"[{info.id}]"
+
+/-- Format widget type with variant like "flex/row" or "grid/3cols". -/
+def formatType (info : WidgetInfo) : String :=
+  match info.containerVariant with
+  | some v => s!"{info.widgetType}/{v}"
+  | none => info.widgetType
+
+/-- Format coordinates like "(0,0)". -/
+def formatCoords (info : WidgetInfo) : String :=
+  s!"({info.rect.x.toUInt32},{info.rect.y.toUInt32})"
+
+/-- Format dimensions like "30x12". -/
+def formatDims (info : WidgetInfo) : String :=
+  s!"{info.rect.width.toUInt32}x{info.rect.height.toUInt32}"
+
+end WidgetInfo
+
+/-- Convert a byte value to a 2-digit hex string. -/
+private def toHex2 (n : Nat) : String :=
+  let hexChars : Array Char := #['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F']
+  let hi := hexChars[n / 16 % 16]!
+  let lo := hexChars[n % 16]!
+  String.ofList [hi, lo]
+
+/-- Format a BoxStyle as a summary string. -/
+def formatStyle (style : BoxStyle) : String := Id.run do
+  let mut parts : Array String := #[]
+  if let some bg := style.backgroundColor then
+    let r := (bg.r * 255).toUInt8.toNat
+    let g := (bg.g * 255).toUInt8.toNat
+    let b := (bg.b * 255).toUInt8.toNat
+    parts := parts.push s!"bg=#{toHex2 r}{toHex2 g}{toHex2 b}"
+  if style.padding.top > 0 || style.padding.left > 0 then
+    parts := parts.push s!"pad={style.padding.top.toUInt32}"
+  if style.borderWidth > 0 then
+    parts := parts.push s!"border={style.borderWidth.toUInt32}"
+  if parts.isEmpty then "-" else ", ".intercalate parts.toList
+
+/-- Collect metadata for all widgets in tree. -/
+partial def collectWidgetInfo (w : Widget) (layouts : Trellis.LayoutResult)
+    (depth : Nat := 0) (parentId : Option WidgetId := none) : Array WidgetInfo := Id.run do
+  let some computed := layouts.get w.id | return #[]
+  let rect := computed.borderRect
+
+  let (widgetType, containerVariant, textContent, styleInfo, childCount) := match w with
+    | .flex _ _ props style children =>
+        let variant := if props.direction.isHorizontal then "row" else "column"
+        let gapInfo := if props.gap > 0 then s!",gap={props.gap.toUInt32}" else ""
+        ("flex", some s!"{variant}{gapInfo}", none, some (formatStyle style), children.size)
+    | .grid _ _ props style children =>
+        let cols := props.templateColumns.tracks.size
+        ("grid", some s!"{cols}cols", none, some (formatStyle style), children.size)
+    | .text _ _ content _ _ _ _ _ =>
+        ("text", none, some content, none, 0)
+    | .rect _ _ style =>
+        ("rect", none, none, some (formatStyle style), 0)
+    | .scroll _ _ style _ _ _ _ =>
+        ("scroll", none, none, some (formatStyle style), 1)
+    | .spacer _ _ width height =>
+        ("spacer", some s!"{width.toUInt32}x{height.toUInt32}", none, none, 0)
+
+  let info : WidgetInfo := {
+    id := w.id
+    name := w.name?
+    widgetType
+    containerVariant
+    rect
+    depth
+    parentId
+    textContent
+    styleInfo
+    childCount
+  }
+
+  let childInfos := w.children.flatMap fun child =>
+    collectWidgetInfo child layouts (depth + 1) (some w.id)
+
+  #[info] ++ childInfos
+
+/-! ## Hierarchy Mode Renderer -/
+
+/-- Truncate a string to max length with ellipsis. -/
+def truncate (s : String) (maxLen : Nat) : String :=
+  if s.length <= maxLen then s
+  else s.take (maxLen - 3) ++ "..."
+
+/-- Check if widget at index i is the last sibling (no more widgets at same depth before depth decreases). -/
+private def isLastSibling (infos : Array WidgetInfo) (i : Nat) : Bool := Id.run do
+  let info := infos[i]!
+  for j in [i+1:infos.size] do
+    let next := infos[j]!
+    if next.depth < info.depth then return true   -- Parent ended, was last
+    if next.depth == info.depth then return false -- Sibling exists
+  return true  -- End of list, was last
+
+/-- Render widget tree as ASCII tree (hierarchy mode).
+    This is the most useful mode for AI analysis. -/
+def renderHierarchy (widget : Widget) (width height : Nat)
+    (config : RenderConfig := {}) : String := Id.run do
+  -- Measure and layout
+  let measureResult : MeasureResult := Id.run (measureWidget widget width.toFloat height.toFloat)
+  let layouts := Trellis.layout measureResult.node width.toFloat height.toFloat
+  let infos := collectWidgetInfo measureResult.widget layouts
+
+  let mut lines : Array String := #[]
+  lines := lines.push "WIDGET TREE"
+  lines := lines.push "==========="
+
+  -- hasMoreAtLevel[d] = true if there are unprocessed siblings at depth d+1
+  -- This is used to draw "│" continuation lines for ancestor branches
+  let mut hasMoreAtLevel : Array Bool := #[]
+
+  for i in [:infos.size] do
+    let info := infos[i]!
+    let isLast := isLastSibling infos i
+
+    -- FIRST: Update hasMoreAtLevel BEFORE building prefix
+    -- This ensures siblings share the same prefix
+    if info.depth > 0 then
+      -- Grow array if needed
+      while hasMoreAtLevel.size < info.depth do
+        hasMoreAtLevel := hasMoreAtLevel.push false
+      -- Shrink array if we've moved up in the tree
+      if hasMoreAtLevel.size > info.depth then
+        hasMoreAtLevel := hasMoreAtLevel.shrink info.depth
+      -- Mark whether there are more siblings at our parent's level
+      hasMoreAtLevel := hasMoreAtLevel.set! (info.depth - 1) (!isLast)
+
+    -- Build prefix: one segment per ancestor level (depths 1 to info.depth-1)
+    -- For depth 1 nodes, there are 0 prefix segments
+    -- For depth 2 nodes, there is 1 prefix segment (for depth 1)
+    let mut linePrefix := ""
+    if info.depth >= 2 then
+      for d in [:info.depth - 1] do
+        if d < hasMoreAtLevel.size && hasMoreAtLevel[d]! then
+          linePrefix := linePrefix ++ "│   "
+        else
+          linePrefix := linePrefix ++ "    "
+
+    -- The connector for this node
+    let connector := if info.depth == 0 then ""
+      else if isLast then "└── "
+      else "├── "
+
+    -- Main line: [id:name] type
+    let label := info.formatLabel (showId := true)
+    let typeStr := info.formatType
+    lines := lines.push s!"{linePrefix}{connector}{label} {typeStr}"
+
+    -- Detail lines use continuation prefix
+    let detailPrefix := if info.depth == 0 then "    "
+      else linePrefix ++ (if isLast then "        " else "│       ")
+
+    if config.showCoordinates || config.showDimensions then
+      let coordStr := if config.showCoordinates then info.formatCoords ++ " " else ""
+      let dimStr := if config.showDimensions then info.formatDims else ""
+      lines := lines.push s!"{detailPrefix}rect: {coordStr}{dimStr}"
+
+    if config.showDepth then
+      lines := lines.push s!"{detailPrefix}depth: {info.depth}"
+
+    if config.showStyles then
+      if let some style := info.styleInfo then
+        lines := lines.push s!"{detailPrefix}style: {style}"
+
+    if let some content := info.textContent then
+      let displayContent := truncate content config.maxContentLength
+      lines := lines.push s!"{detailPrefix}content: \"{displayContent}\""
+
+  -- Summary section
+  lines := lines.push ""
+  lines := lines.push "SUMMARY"
+  lines := lines.push "-------"
+  lines := lines.push s!"Total widgets: {infos.size}"
+  let maxDepth := infos.foldl (fun m i => max m i.depth) 0
+  lines := lines.push s!"Tree depth: {maxDepth + 1}"
+  let containers := infos.filter (·.childCount > 0)
+  let flexCount := containers.filter (·.widgetType == "flex") |>.size
+  let gridCount := containers.filter (·.widgetType == "grid") |>.size
+  lines := lines.push s!"Containers: {containers.size} (flex={flexCount}, grid={gridCount})"
+  let leaves := infos.filter (·.childCount == 0)
+  let textCount := leaves.filter (·.widgetType == "text") |>.size
+  let rectCount := leaves.filter (·.widgetType == "rect") |>.size
+  let spacerCount := leaves.filter (·.widgetType == "spacer") |>.size
+  lines := lines.push s!"Leaves: {leaves.size} (text={textCount}, rect={rectCount}, spacer={spacerCount})"
+
+  "\n".intercalate lines.toList
+
+/-! ## Combined Mode Renderer -/
+
+/-- Render visual output with legend section (combined mode). -/
+def renderCombined (widget : Widget) (width height : Nat)
+    (_config : RenderConfig := {}) : String := Id.run do
+  -- Measure and layout
+  let measureResult : MeasureResult := Id.run (measureWidget widget width.toFloat height.toFloat)
+  let layouts := Trellis.layout measureResult.node width.toFloat height.toFloat
+  let infos := collectWidgetInfo measureResult.widget layouts
+
+  -- Visual section
+  let cmds := collectCommands measureResult.widget layouts
+  let visualOutput := renderToAscii cmds width height
+
+  let mut lines : Array String := #[]
+  lines := lines.push s!"VISUAL OUTPUT ({width}x{height})"
+  lines := lines.push (String.ofList (List.replicate (width + 5) '='))
+  lines := lines.push visualOutput
+  lines := lines.push ""
+
+  -- Legend section
+  lines := lines.push "LEGEND"
+  lines := lines.push "------"
+
+  for info in infos do
+    let idCol := padRight info.formatLabel 12
+    let typeCol := padRight info.formatType 12
+    let coordCol := padRight (s!"@ " ++ info.formatCoords) 12
+    let dimCol := padRight info.formatDims 8
+    let depthCol := padRight s!"d={info.depth}" 6
+
+    let extra := match info.textContent with
+      | some c => s!"\"{truncate c 20}\""
+      | none => info.styleInfo.getD ""
+
+    lines := lines.push s!"{idCol} {typeCol} {coordCol} {dimCol} {depthCol} {extra}"
+
+  "\n".intercalate lines.toList
+
+/-! ## Structure Mode Renderer -/
+
+/-- Render with widget boundaries labeled (structure mode). -/
+def renderStructure (widget : Widget) (width height : Nat)
+    (_config : RenderConfig := {}) : String := Id.run do
+  -- Measure and layout
+  let measureResult : MeasureResult := Id.run (measureWidget widget width.toFloat height.toFloat)
+  let layouts := Trellis.layout measureResult.node width.toFloat height.toFloat
+  let infos := collectWidgetInfo measureResult.widget layouts
+
+  let mut canvas := Canvas.create width height
+
+  -- PASS 1: Draw box outlines for LEAF widgets only
+  -- Containers are implied by layout; showing their boxes creates visual clutter
+  for info in infos do
+    let x := info.rect.x.toUInt32.toNat
+    let y := info.rect.y.toUInt32.toNat
+    let w := info.rect.width.toUInt32.toNat
+    let h := info.rect.height.toUInt32.toNat
+    let isLeaf := info.childCount == 0
+    if w >= 2 && h >= 2 && isLeaf then
+      canvas := canvas.strokeBox x y w h .single
+
+  -- PASS 2: Draw labels for LEAF widgets only (containers shown via boxes only)
+  for info in infos do
+    let x := info.rect.x.toUInt32.toNat
+    let y := info.rect.y.toUInt32.toNat
+    let w := info.rect.width.toUInt32.toNat
+    let h := info.rect.height.toUInt32.toNat
+    let isLeaf := info.childCount == 0
+
+    if h >= 2 && w >= 2 && isLeaf then
+      -- Leaf widget with visible box - draw label in the top border
+      let label := info.formatLabel ++ ":" ++ info.widgetType
+      let labelTrunc := truncate label (w - 2)
+      if labelTrunc.length > 0 && w > 2 then
+        canvas := canvas.drawText (x + 1) y labelTrunc
+
+      -- For text widgets with boxes, show content centered
+      if let some content := info.textContent then
+        if h >= 3 then
+          let displayText := truncate content (w - 4)
+          let textY := y + h / 2
+          canvas := canvas.drawTextCentered x textY w s!"\"{displayText}\""
+    else if h < 2 && isLeaf then
+      -- Leaf widget without box (like single-line text) - show labeled content
+      if let some content := info.textContent then
+        let label := s!"[{info.name.getD (toString info.id)}] "
+        let displayText := truncate content (w - label.length)
+        canvas := canvas.drawText x y (label ++ displayText)
+
+  canvas.toString
+
+/-! ## Unified API -/
+
+/-- Main entry point for debug-friendly widget rendering.
+    Use this with different RenderConfig.mode values for different output formats. -/
+def renderWidgetWith (widget : Widget) (width height : Nat)
+    (config : RenderConfig := {}) : String :=
+  match config.mode with
+  | .visual => renderWidget widget width height
+  | .structure => renderStructure widget width height config
+  | .hierarchy => renderHierarchy widget width height config
+  | .combined => renderCombined widget width height config
+
+/-- Convenience function for hierarchy mode (most useful for AI). -/
+def renderHierarchyMode (widget : Widget) (width height : Nat) : String :=
+  renderWidgetWith widget width height { mode := .hierarchy }
+
+/-- Convenience function for structure mode. -/
+def renderStructureMode (widget : Widget) (width height : Nat) : String :=
+  renderWidgetWith widget width height { mode := .structure }
+
+/-- Convenience function for combined mode. -/
+def renderCombinedMode (widget : Widget) (width height : Nat) : String :=
+  renderWidgetWith widget width height { mode := .combined }
 
 end Arbor.Text

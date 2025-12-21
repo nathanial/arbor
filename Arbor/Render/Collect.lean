@@ -93,10 +93,10 @@ partial def collectWidget (w : Widget) (layouts : Trellis.LayoutResult) : Collec
   let contentRect := computed.contentRect
 
   match w with
-  | .rect _ style =>
+  | .rect _ _ style =>
     collectBoxStyle borderRect style
 
-  | .text _ content font color align _ textLayoutOpt =>
+  | .text _ _ content font color align _ textLayoutOpt =>
     match textLayoutOpt with
     | some textLayout =>
       collectWrappedText contentRect font color align textLayout
@@ -105,21 +105,21 @@ partial def collectWidget (w : Widget) (layouts : Trellis.LayoutResult) : Collec
       -- (this path shouldn't normally be hit if measureWidget was called)
       collectSingleLineText contentRect content font color align contentRect.width 16.0
 
-  | .spacer _ _ _ =>
+  | .spacer _ _ _ _ =>
     -- Spacers don't render anything
     pure ()
 
-  | .flex _ _ style children =>
+  | .flex _ _ _ style children =>
     collectBoxStyle borderRect style
     for child in children do
       collectWidget child layouts
 
-  | .grid _ _ style children =>
+  | .grid _ _ _ style children =>
     collectBoxStyle borderRect style
     for child in children do
       collectWidget child layouts
 
-  | .scroll _ style scrollState _ _ child =>
+  | .scroll _ _ style scrollState _ _ child =>
     -- Render background
     collectBoxStyle borderRect style
 

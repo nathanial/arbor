@@ -60,7 +60,7 @@ where
 
     -- For scroll containers, adjust offset for children
     let childOffset := match w with
-      | .scroll _ _ scrollState _ _ _ =>
+      | .scroll _ _ _ scrollState _ _ _ =>
         scrollOffset.add { x := scrollState.offsetX, y := scrollState.offsetY }
       | _ => scrollOffset
 
@@ -118,7 +118,7 @@ where
 
         -- Calculate child offset for scroll containers
         let childOffset := match w with
-          | .scroll _ _ scrollState _ _ _ =>
+          | .scroll _ _ _ scrollState _ _ _ =>
             scrollOffset.add { x := scrollState.offsetX, y := scrollState.offsetY }
           | _ => scrollOffset
 

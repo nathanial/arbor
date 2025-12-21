@@ -38,4 +38,5 @@ import Arbor.Event.Scroll
 
 -- Text-based rendering (for debugging/testing)
 import Arbor.Text.Canvas
+import Arbor.Text.Mode
 import Arbor.Text.Renderer

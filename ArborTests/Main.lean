@@ -66,23 +66,23 @@ test "fillText command" := do
 testSuite "Widget.Core"
 
 test "Widget id extraction" := do
-  let w := Widget.spacer 42 10 20
+  let w := Widget.spacer 42 none 10 20
   w.id ≡ 42
 
 test "Widget children - flex" := do
-  let child1 := Widget.spacer 1 10 10
-  let child2 := Widget.spacer 2 20 20
-  let parent := Widget.flex 0 Trellis.FlexContainer.row {} #[child1, child2]
+  let child1 := Widget.spacer 1 none 10 10
+  let child2 := Widget.spacer 2 none 20 20
+  let parent := Widget.flex 0 none Trellis.FlexContainer.row {} #[child1, child2]
   parent.children.size ≡ 2
 
 test "Widget children - leaf" := do
-  let w := Widget.spacer 0 10 20
+  let w := Widget.spacer 0 none 10 20
   w.children.size ≡ 0
 
 test "Widget isContainer" := do
-  let flex := Widget.flex 0 Trellis.FlexContainer.row {} #[]
+  let flex := Widget.flex 0 none Trellis.FlexContainer.row {} #[]
   ensure flex.isContainer "Flex should be container"
-  let spc := Widget.spacer 0 10 10
+  let spc := Widget.spacer 0 none 10 10
   ensure (!spc.isContainer) "Spacer should not be container"
 
 /-! ## DSL Tests -/
@@ -92,7 +92,7 @@ testSuite "Widget.DSL"
 test "build spacer" := do
   let widget := build (spacer 10 20)
   match widget with
-  | .spacer id w h =>
+  | .spacer id _ w h =>
     id ≡ 0
     w ≡ 10
     h ≡ 20
@@ -101,7 +101,7 @@ test "build spacer" := do
 test "coloredBox creates rect with style" := do
   let widget := build (coloredBox Tincture.Color.blue 100 50)
   match widget with
-  | .rect id style =>
+  | .rect id _ style =>
     id ≡ 0
     style.minWidth ≡ some 100
     style.minHeight ≡ some 50
@@ -176,7 +176,7 @@ test "FixedWidthMeasurer measures char" := do
 testSuite "Render.Collect"
 
 test "collectCommands generates commands for spacer" := do
-  let widget := Widget.spacer 0 100 50
+  let widget := Widget.spacer 0 none 100 50
   let node := Trellis.LayoutNode.leaf 0 ⟨100, 50⟩
   let layouts := Trellis.layout node 100 50
   let cmds := collectCommands widget layouts
@@ -185,7 +185,7 @@ test "collectCommands generates commands for spacer" := do
 
 test "collectCommands generates commands for colored rect" := do
   let style : BoxStyle := { backgroundColor := some Tincture.Color.red }
-  let widget := Widget.rect 0 style
+  let widget := Widget.rect 0 none style
   let node := Trellis.LayoutNode.leaf 0 ⟨100, 50⟩
   let layouts := Trellis.layout node 100 50
   let cmds := collectCommands widget layouts

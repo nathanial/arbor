@@ -80,22 +80,26 @@ def card (bg : Color) (p : Float) : BoxStyle :=
 end BoxStyle
 
 /-- Core widget type - declarative, display-only.
-    Uses FontId instead of concrete Font type for renderer independence. -/
+    Uses FontId instead of concrete Font type for renderer independence.
+    Each widget has an optional `name` for debug/semantic identification. -/
 inductive Widget where
   /-- Flexbox container -/
   | flex (id : WidgetId)
+         (name : Option String := none)
          (props : Trellis.FlexContainer)
          (style : BoxStyle)
          (children : Array Widget)
 
   /-- CSS Grid container -/
   | grid (id : WidgetId)
+         (name : Option String := none)
          (props : Trellis.GridContainer)
          (style : BoxStyle)
          (children : Array Widget)
 
   /-- Text with optional wrapping -/
   | text (id : WidgetId)
+         (name : Option String := none)
          (content : String)
          (font : FontId)
          (color : Color)
@@ -105,10 +109,12 @@ inductive Widget where
 
   /-- A colored rectangle box -/
   | rect (id : WidgetId)
+         (name : Option String := none)
          (style : BoxStyle)
 
   /-- Scroll container with clipping -/
   | scroll (id : WidgetId)
+           (name : Option String := none)
            (style : BoxStyle)
            (scrollState : ScrollState)
            (contentWidth : Float)
@@ -117,6 +123,7 @@ inductive Widget where
 
   /-- Fixed-size spacer -/
   | spacer (id : WidgetId)
+           (name : Option String := none)
            (width : Float)
            (height : Float)
 
@@ -133,19 +140,28 @@ def id : Widget → WidgetId
   | .scroll id .. => id
   | .spacer id .. => id
 
+/-- Get the widget's optional name for debug identification. -/
+def name? : Widget → Option String
+  | .flex _ name .. => name
+  | .grid _ name .. => name
+  | .text _ name .. => name
+  | .rect _ name .. => name
+  | .scroll _ name .. => name
+  | .spacer _ name .. => name
+
 /-- Get the widget's children (empty for leaf widgets). -/
 def children : Widget → Array Widget
-  | .flex _ _ _ children => children
-  | .grid _ _ _ children => children
-  | .scroll _ _ _ _ _ child => #[child]
+  | .flex _ _ _ _ children => children
+  | .grid _ _ _ _ children => children
+  | .scroll _ _ _ _ _ _ child => #[child]
   | _ => #[]
 
 /-- Get the widget's style if it has one. -/
 def style? : Widget → Option BoxStyle
-  | .flex _ _ style _ => some style
-  | .grid _ _ style _ => some style
-  | .rect _ style => some style
-  | .scroll _ style .. => some style
+  | .flex _ _ _ style _ => some style
+  | .grid _ _ _ style _ => some style
+  | .rect _ _ style => some style
+  | .scroll _ _ style .. => some style
   | _ => none
 
 /-- Check if this widget is a container. -/

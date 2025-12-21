@@ -27,13 +27,19 @@ def freshId : StateM BuilderState WidgetId := do
 def text' (content : String) (font : FontId) (color : Color := Tincture.Color.white)
     (align : TextAlign := .left) (maxWidth : Option Float := none) : WidgetBuilder := do
   let wid ← freshId
-  pure (.text wid content font color align maxWidth none)
+  pure (.text wid none content font color align maxWidth none)
+
+/-- Create a named text widget with optional wrapping. -/
+def namedText (name : String) (content : String) (font : FontId) (color : Color := Tincture.Color.white)
+    (align : TextAlign := .left) (maxWidth : Option Float := none) : WidgetBuilder := do
+  let wid ← freshId
+  pure (.text wid (some name) content font color align maxWidth none)
 
 /-- Create a text widget that wraps at the given width. -/
 def wrappedText (content : String) (font : FontId) (maxWidth : Float)
     (color : Color := Tincture.Color.white) (align : TextAlign := .left) : WidgetBuilder := do
   let wid ← freshId
-  pure (.text wid content font color align (some maxWidth) none)
+  pure (.text wid none content font color align (some maxWidth) none)
 
 /-- Create a centered text widget. -/
 def centeredText (content : String) (font : FontId) (color : Color := Tincture.Color.white) : WidgetBuilder :=
@@ -44,17 +50,27 @@ def centeredText (content : String) (font : FontId) (color : Color := Tincture.C
 /-- Create a colored rectangle box. -/
 def box (style : BoxStyle) : WidgetBuilder := do
   let wid ← freshId
-  pure (.rect wid style)
+  pure (.rect wid none style)
+
+/-- Create a named colored rectangle box. -/
+def namedBox (name : String) (style : BoxStyle) : WidgetBuilder := do
+  let wid ← freshId
+  pure (.rect wid (some name) style)
 
 /-- Create a simple colored box with dimensions. -/
 def coloredBox (color : Color) (width height : Float) : WidgetBuilder := do
   let wid ← freshId
-  pure (.rect wid { backgroundColor := some color, minWidth := some width, minHeight := some height })
+  pure (.rect wid none { backgroundColor := some color, minWidth := some width, minHeight := some height })
+
+/-- Create a named colored box with dimensions. -/
+def namedColoredBox (name : String) (color : Color) (width height : Float) : WidgetBuilder := do
+  let wid ← freshId
+  pure (.rect wid (some name) { backgroundColor := some color, minWidth := some width, minHeight := some height })
 
 /-- Create a spacer with fixed dimensions. -/
 def spacer (width height : Float) : WidgetBuilder := do
   let wid ← freshId
-  pure (.spacer wid width height)
+  pure (.spacer wid none width height)
 
 /-- Create a horizontal spacer (for row layouts). -/
 def hspacer (width : Float) : WidgetBuilder := spacer width 0
@@ -69,33 +85,54 @@ def row (gap : Float := 0) (style : BoxStyle := {}) (children : Array WidgetBuil
   let wid ← freshId
   let props := Trellis.FlexContainer.row gap
   let cs ← children.mapM fun b => b
-  pure (.flex wid props style cs)
+  pure (.flex wid none props style cs)
+
+/-- Create a named horizontal flex row. -/
+def namedRow (name : String) (gap : Float := 0) (style : BoxStyle := {}) (children : Array WidgetBuilder) : WidgetBuilder := do
+  let wid ← freshId
+  let props := Trellis.FlexContainer.row gap
+  let cs ← children.mapM fun b => b
+  pure (.flex wid (some name) props style cs)
 
 /-- Create a vertical flex column. -/
 def column (gap : Float := 0) (style : BoxStyle := {}) (children : Array WidgetBuilder) : WidgetBuilder := do
   let wid ← freshId
   let props := Trellis.FlexContainer.column gap
   let cs ← children.mapM fun b => b
-  pure (.flex wid props style cs)
+  pure (.flex wid none props style cs)
+
+/-- Create a named vertical flex column. -/
+def namedColumn (name : String) (gap : Float := 0) (style : BoxStyle := {}) (children : Array WidgetBuilder) : WidgetBuilder := do
+  let wid ← freshId
+  let props := Trellis.FlexContainer.column gap
+  let cs ← children.mapM fun b => b
+  pure (.flex wid (some name) props style cs)
 
 /-- Create a row with custom flex properties. -/
 def flexRow (props : Trellis.FlexContainer) (style : BoxStyle := {}) (children : Array WidgetBuilder) : WidgetBuilder := do
   let wid ← freshId
   let cs ← children.mapM fun b => b
-  pure (.flex wid { props with direction := .row } style cs)
+  pure (.flex wid none { props with direction := .row } style cs)
 
 /-- Create a column with custom flex properties. -/
 def flexColumn (props : Trellis.FlexContainer) (style : BoxStyle := {}) (children : Array WidgetBuilder) : WidgetBuilder := do
   let wid ← freshId
   let cs ← children.mapM fun b => b
-  pure (.flex wid { props with direction := .column } style cs)
+  pure (.flex wid none { props with direction := .column } style cs)
 
 /-- Create a centered container (centers single child). -/
 def center (style : BoxStyle := {}) (child : WidgetBuilder) : WidgetBuilder := do
   let wid ← freshId
   let props := Trellis.FlexContainer.centered
   let c ← child
-  pure (.flex wid props style #[c])
+  pure (.flex wid none props style #[c])
+
+/-- Create a named centered container (centers single child). -/
+def namedCenter (name : String) (style : BoxStyle := {}) (child : WidgetBuilder) : WidgetBuilder := do
+  let wid ← freshId
+  let props := Trellis.FlexContainer.centered
+  let c ← child
+  pure (.flex wid (some name) props style #[c])
 
 /-- Create a container with space-between alignment. -/
 def spaceBetween (direction : Trellis.FlexDirection := .row) (style : BoxStyle := {})
@@ -103,7 +140,7 @@ def spaceBetween (direction : Trellis.FlexDirection := .row) (style : BoxStyle :
   let wid ← freshId
   let props := { Trellis.FlexContainer.default with direction, justifyContent := .spaceBetween }
   let cs ← children.mapM fun b => b
-  pure (.flex wid props style cs)
+  pure (.flex wid none props style cs)
 
 /-- Create a container with space-around alignment. -/
 def spaceAround (direction : Trellis.FlexDirection := .row) (style : BoxStyle := {})
@@ -111,7 +148,7 @@ def spaceAround (direction : Trellis.FlexDirection := .row) (style : BoxStyle :=
   let wid ← freshId
   let props := { Trellis.FlexContainer.default with direction, justifyContent := .spaceAround }
   let cs ← children.mapM fun b => b
-  pure (.flex wid props style cs)
+  pure (.flex wid none props style cs)
 
 /-! ## Grid Container Widgets -/
 
@@ -121,14 +158,22 @@ def grid (columns : Nat) (gap : Float := 0) (style : BoxStyle := {})
   let wid ← freshId
   let props := Trellis.GridContainer.columns columns gap
   let cs ← children.mapM fun b => b
-  pure (.grid wid props style cs)
+  pure (.grid wid none props style cs)
+
+/-- Create a named grid with n equal columns. -/
+def namedGrid (name : String) (columns : Nat) (gap : Float := 0) (style : BoxStyle := {})
+    (children : Array WidgetBuilder) : WidgetBuilder := do
+  let wid ← freshId
+  let props := Trellis.GridContainer.columns columns gap
+  let cs ← children.mapM fun b => b
+  pure (.grid wid (some name) props style cs)
 
 /-- Create a grid with custom properties. -/
 def gridCustom (props : Trellis.GridContainer) (style : BoxStyle := {})
     (children : Array WidgetBuilder) : WidgetBuilder := do
   let wid ← freshId
   let cs ← children.mapM fun b => b
-  pure (.grid wid props style cs)
+  pure (.grid wid none props style cs)
 
 /-! ## Scroll Widgets -/
 
@@ -137,7 +182,14 @@ def scroll (style : BoxStyle := {}) (contentWidth contentHeight : Float)
     (scrollState : ScrollState := {}) (child : WidgetBuilder) : WidgetBuilder := do
   let wid ← freshId
   let c ← child
-  pure (.scroll wid style scrollState contentWidth contentHeight c)
+  pure (.scroll wid none style scrollState contentWidth contentHeight c)
+
+/-- Create a named scroll container. -/
+def namedScroll (name : String) (style : BoxStyle := {}) (contentWidth contentHeight : Float)
+    (scrollState : ScrollState := {}) (child : WidgetBuilder) : WidgetBuilder := do
+  let wid ← freshId
+  let c ← child
+  pure (.scroll wid (some name) style scrollState contentWidth contentHeight c)
 
 /-- Create a vertical scroll container (scrolls only vertically). -/
 def vscroll (style : BoxStyle := {}) (contentHeight : Float)
@@ -154,7 +206,7 @@ def padded (padding : Float) (child : WidgetBuilder) : WidgetBuilder := do
   let props := Trellis.FlexContainer.default
   let style := { padding := Trellis.EdgeInsets.uniform padding }
   let c ← child
-  pure (.flex wid props style #[c])
+  pure (.flex wid none props style #[c])
 
 /-- Create a container with margin around a child. -/
 def marginBox (margin : Float) (child : WidgetBuilder) : WidgetBuilder := do
@@ -162,7 +214,7 @@ def marginBox (margin : Float) (child : WidgetBuilder) : WidgetBuilder := do
   let props := Trellis.FlexContainer.default
   let style := { margin := Trellis.EdgeInsets.uniform margin }
   let c ← child
-  pure (.flex wid props style #[c])
+  pure (.flex wid none props style #[c])
 
 /-- Create a card (box with background and padding). -/
 def card (bg : Color) (padding : Float := 16) (child : WidgetBuilder) : WidgetBuilder := do
@@ -170,7 +222,15 @@ def card (bg : Color) (padding : Float := 16) (child : WidgetBuilder) : WidgetBu
   let props := Trellis.FlexContainer.default
   let style := BoxStyle.card bg padding
   let c ← child
-  pure (.flex wid props style #[c])
+  pure (.flex wid none props style #[c])
+
+/-- Create a named card (box with background and padding). -/
+def namedCard (name : String) (bg : Color) (padding : Float := 16) (child : WidgetBuilder) : WidgetBuilder := do
+  let wid ← freshId
+  let props := Trellis.FlexContainer.default
+  let style := BoxStyle.card bg padding
+  let c ← child
+  pure (.flex wid (some name) props style #[c])
 
 /-- Create a container with border. -/
 def bordered (borderColor : Color) (borderWidth : Float := 1) (child : WidgetBuilder) : WidgetBuilder := do
@@ -178,7 +238,7 @@ def bordered (borderColor : Color) (borderWidth : Float := 1) (child : WidgetBui
   let props := Trellis.FlexContainer.default
   let style := { borderColor := some borderColor, borderWidth }
   let c ← child
-  pure (.flex wid props style #[c])
+  pure (.flex wid none props style #[c])
 
 /-! ## Building -/
 

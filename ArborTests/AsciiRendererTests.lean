@@ -81,6 +81,52 @@ def testDebugBorders : IO Unit := do
   IO.println ascii
   IO.println ""
 
+/-! ## New Rendering Modes for AI Analysis -/
+
+def testHierarchyMode : IO Unit := do
+  IO.println "=== Hierarchy Mode Test (Best for AI) ==="
+  -- Create a widget with semantic names
+  let widget := build do
+    namedColumn "root" (gap := 1) (style := { backgroundColor := some (Tincture.Color.gray 0.3), padding := Trellis.EdgeInsets.uniform 1 }) #[
+      namedText "title" "My App Title" FontId.default Tincture.Color.white .center,
+      namedRow "content" (gap := 2) {} #[
+        namedBox "sidebar" { backgroundColor := some Tincture.Color.white, minWidth := some 8, minHeight := some 3 },
+        namedBox "main" { backgroundColor := some Tincture.Color.white, minWidth := some 12, minHeight := some 3 }
+      ],
+      namedText "footer" "Status: OK" FontId.default Tincture.Color.white .center
+    ]
+
+  let ascii := renderHierarchyMode widget 40 12
+  IO.println ascii
+  IO.println ""
+
+def testCombinedMode : IO Unit := do
+  IO.println "=== Combined Mode Test (Visual + Legend) ==="
+  let widget := build do
+    namedColumn "app" (gap := 1) {} #[
+      namedText "header" "Header Text" FontId.default Tincture.Color.white .left,
+      namedRow "buttons" (gap := 1) {} #[
+        namedBox "btn1" { backgroundColor := some (Tincture.Color.gray 0.5), minWidth := some 6, minHeight := some 2 },
+        namedBox "btn2" { backgroundColor := some (Tincture.Color.gray 0.5), minWidth := some 6, minHeight := some 2 }
+      ]
+    ]
+
+  let ascii := renderCombinedMode widget 25 8
+  IO.println ascii
+  IO.println ""
+
+def testStructureMode : IO Unit := do
+  IO.println "=== Structure Mode Test (Labeled Boundaries) ==="
+  let widget := build do
+    namedColumn "layout" (gap := 1) {} #[
+      namedText "title" "Title" FontId.default Tincture.Color.white .center,
+      namedBox "content" { minWidth := some 15, minHeight := some 4 }
+    ]
+
+  let ascii := renderStructureMode widget 25 10
+  IO.println ascii
+  IO.println ""
+
 def main : IO Unit := do
   testSimpleBox
   testTextWidget
@@ -88,4 +134,9 @@ def main : IO Unit := do
   testColumnLayout
   testNestedLayout
   testDebugBorders
+  IO.println "─── New AI-Friendly Modes ───"
+  IO.println ""
+  testHierarchyMode
+  testCombinedMode
+  testStructureMode
   IO.println "All ASCII renderer tests completed!"
