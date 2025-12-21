@@ -5,6 +5,11 @@
 -/
 import Arbor.Text.Canvas
 import Arbor.Render.Command
+import Arbor.Render.Collect
+import Arbor.Widget.Core
+import Arbor.Widget.Measure
+import Arbor.Core.TextMeasurer
+import Trellis
 
 namespace Arbor.Text
 
@@ -195,5 +200,91 @@ def debugLayout (boxes : Array (String × Rect)) (width height : Nat) : String :
     -- Add label
     cmds := cmds.push (.fillText label (rect.x + 1) (rect.y) FontId.default Tincture.Color.white)
   renderToAscii cmds width height
+
+/-- Simple fixed-width text measurer for ASCII rendering.
+    Assumes each character is 1 unit wide. -/
+structure AsciiMeasurer where
+  charWidth : Float := 1.0
+  charHeight : Float := 1.0
+deriving Repr, Inhabited
+
+namespace AsciiMeasurer
+
+def default : AsciiMeasurer := {}
+
+def measureText (m : AsciiMeasurer) (text : String) : TextMetrics :=
+  let width := text.length.toFloat * m.charWidth
+  let height := m.charHeight
+  ⟨width, height, height * 0.8, height * 0.2, height⟩
+
+def measureChar' (m : AsciiMeasurer) (_c : Char) : Float := m.charWidth
+
+def fontMetrics' (m : AsciiMeasurer) : TextMetrics :=
+  ⟨0, m.charHeight, m.charHeight * 0.8, m.charHeight * 0.2, m.charHeight⟩
+
+end AsciiMeasurer
+
+/-- TextMeasurer instance for ASCII rendering using Identity monad. -/
+instance : TextMeasurer Id where
+  measureText text _fontId := AsciiMeasurer.default.measureText text
+  measureChar c _fontId := AsciiMeasurer.default.measureChar' c
+  fontMetrics _fontId := AsciiMeasurer.default.fontMetrics'
+
+/-- Render a widget tree to ASCII art.
+    Uses fixed-width character measurement (1 char = 1 unit).
+
+    Parameters:
+    - widget: The widget tree to render
+    - width: Canvas width in characters
+    - height: Canvas height in characters
+
+    Returns: ASCII art string representation of the widget. -/
+def renderWidget (widget : Widget) (width height : Nat) : String :=
+  -- Measure widget with ASCII measurer (1 char = 1 unit)
+  let measureResult : MeasureResult := Id.run (measureWidget widget width.toFloat height.toFloat)
+  let layoutNode := measureResult.node
+  let measuredWidget := measureResult.widget
+  -- Compute layout
+  let layouts := Trellis.layout layoutNode width.toFloat height.toFloat
+  -- Collect render commands
+  let cmds := collectCommands measuredWidget layouts
+  -- Render to ASCII
+  renderToAscii cmds width height
+
+/-- Render a widget tree to ASCII art with debug borders around each widget. -/
+def renderWidgetDebug (widget : Widget) (width height : Nat)
+    (borderColor : Color := Tincture.Color.white) : String :=
+  let measureResult : MeasureResult := Id.run (measureWidget widget width.toFloat height.toFloat)
+  let layoutNode := measureResult.node
+  let measuredWidget := measureResult.widget
+  let layouts := Trellis.layout layoutNode width.toFloat height.toFloat
+  let cmds := collectCommandsWithDebug measuredWidget layouts borderColor
+  renderToAscii cmds width height
+
+/-- Render a widget tree centered in the canvas. -/
+def renderWidgetCentered (widget : Widget) (width height : Nat) : String :=
+  let (intrinsicW, intrinsicH) : Float × Float := Id.run (intrinsicSize widget)
+  let measureResult : MeasureResult := Id.run (measureWidget widget intrinsicW intrinsicH)
+  let layoutNode := measureResult.node
+  let measuredWidget := measureResult.widget
+  let layouts := Trellis.layout layoutNode intrinsicW intrinsicH
+  -- Collect commands
+  let cmds := collectCommands measuredWidget layouts
+  -- Calculate offset to center
+  let offsetX := (width.toFloat - intrinsicW) / 2
+  let offsetY := (height.toFloat - intrinsicH) / 2
+  -- Wrap in translation
+  let centeredCmds := RenderCommands.withTranslate offsetX offsetY cmds
+  renderToAscii centeredCmds width height
+
+/-- Render a widget with a border around the canvas. -/
+def renderWidgetWithBorder (widget : Widget) (width height : Nat)
+    (title : String := "") (chars : Canvas.BoxChars := .single) : String :=
+  let measureResult : MeasureResult := Id.run (measureWidget widget (width - 2).toFloat (height - 2).toFloat)
+  let layoutNode := measureResult.node
+  let measuredWidget := measureResult.widget
+  let layouts := Trellis.layout layoutNode (width - 2).toFloat (height - 2).toFloat
+  let cmds := collectCommands measuredWidget layouts
+  renderWithBorder cmds width height title chars
 
 end Arbor.Text

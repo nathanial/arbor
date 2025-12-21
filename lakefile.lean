@@ -29,3 +29,6 @@ lean_lib ArborTests where
 @[test_driver]
 lean_exe arbor_tests where
   root := `ArborTests.Main
+
+lean_exe ascii_demo where
+  root := `ArborTests.AsciiRendererTests
