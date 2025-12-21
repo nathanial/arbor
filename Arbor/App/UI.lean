@@ -36,6 +36,7 @@ structure EventContext where
   globalPos : Option Point := none
   localPos : Option Point := none
   contentPos : Option Point := none
+  isCaptured : Bool := false
 
 /-- Handler for events on a widget. -/
 abbrev Handler (Msg : Type) := EventContext → Event → EventResult Msg
@@ -100,7 +101,7 @@ def eventPosition? : Event → Option Point
   | .keyRelease _ => none
 
 private def contextFor (id : WidgetId) (path : Array WidgetId)
-    (layouts : Trellis.LayoutResult) (globalPos : Option Point) : Option EventContext := do
+    (layouts : Trellis.LayoutResult) (globalPos : Option Point) (isCaptured : Bool) : Option EventContext := do
   let layout ← layouts.get id
   let localPos := globalPos.map fun p =>
     ⟨p.x - layout.borderRect.x, p.y - layout.borderRect.y⟩
@@ -114,6 +115,7 @@ private def contextFor (id : WidgetId) (path : Array WidgetId)
     globalPos
     localPos
     contentPos
+    isCaptured
   }
 
 /-- Dispatch a single event through the widget tree.
@@ -130,7 +132,7 @@ def dispatchEvent {Msg : Type} (event : Event) (root : Widget) (layouts : Trelli
   match captureState.captured with
   | some capturedId =>
     if let some h := handlers.handlers[capturedId]? then
-      match contextFor capturedId #[capturedId] layouts globalPos with
+      match contextFor capturedId #[capturedId] layouts globalPos true with
       | some ctx =>
         let res := h ctx event
         msgs := msgs ++ res.msgs
@@ -155,7 +157,7 @@ def dispatchEvent {Msg : Type} (event : Event) (root : Widget) (layouts : Trelli
         for id in dispatchPath do
           if !stop then
             if let some h := handlers.handlers[id]? then
-              match contextFor id path layouts globalPos with
+              match contextFor id path layouts globalPos false with
               | some ctx =>
                 let res := h ctx event
                 msgs := msgs ++ res.msgs
