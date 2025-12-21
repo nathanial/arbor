@@ -154,6 +154,8 @@ def wrapText {M : Type → Type} [Monad M] [TextMeasurer M] (font : FontId) (tex
       if lines.size == 0 then 0
       else glyphHeight + lineAdvance * (lines.size - 1).toFloat
     maxWidth := maxLineWidth
+    lineHeight := lineAdvance
+    ascender := metrics.ascender
   }
 
 /-- Measure text without wrapping (single line). -/
@@ -162,6 +164,7 @@ def measureSingleLine {M : Type → Type} [Monad M] [TextMeasurer M] (font : Fon
     return TextLayout.empty
   let m ← TextMeasurer.measureText text font
   let metrics ← TextMeasurer.fontMetrics font
-  return TextLayout.singleLine text m.width (max m.height metrics.height)
+  let height := max m.height metrics.height
+  return { lines := #[⟨text, m.width⟩], totalHeight := height, maxWidth := m.width, lineHeight := height, ascender := metrics.ascender }
 
 end Arbor

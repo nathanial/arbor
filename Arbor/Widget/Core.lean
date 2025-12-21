@@ -19,14 +19,16 @@ structure TextLayout where
   lines : Array TextLine
   totalHeight : Float
   maxWidth : Float
+  lineHeight : Float := 16  -- Line height for advancing between lines
+  ascender : Float := 12    -- Distance from baseline to top of text (for vertical positioning)
 deriving Repr, BEq, Inhabited
 
 namespace TextLayout
 
-def empty : TextLayout := ⟨#[], 0, 0⟩
+def empty : TextLayout := ⟨#[], 0, 0, 16, 12⟩
 
 def singleLine (text : String) (width height : Float) : TextLayout :=
-  ⟨#[⟨text, width⟩], height, width⟩
+  ⟨#[⟨text, width⟩], height, width, height, height * 0.8⟩
 
 end TextLayout
 

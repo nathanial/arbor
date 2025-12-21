@@ -46,12 +46,17 @@ def collectBoxStyle (rect : Trellis.LayoutRect) (style : BoxStyle) : CollectM Un
     if style.borderWidth > 0 then
       CollectM.emit (.strokeRect r bc style.borderWidth style.cornerRadius)
 
-/-- Collect render commands for wrapped text with alignment. -/
+/-- Collect render commands for wrapped text with alignment.
+    Text is vertically centered within the content rect.
+    Baseline = top + verticalOffset + ascender (where verticalOffset centers the text block). -/
 def collectWrappedText (contentRect : Trellis.LayoutRect) (font : FontId)
-    (color : Color) (align : TextAlign) (textLayout : TextLayout)
-    (lineHeight : Float) : CollectM Unit := do
-  -- Start y at top of content rect
-  let mut y := contentRect.y
+    (color : Color) (align : TextAlign) (textLayout : TextLayout) : CollectM Unit := do
+  let lineHeight := textLayout.lineHeight
+  let ascender := textLayout.ascender
+  -- Vertical centering: offset to center the text block within the content rect
+  let verticalOffset := (contentRect.height - textLayout.totalHeight) / 2
+  -- First baseline: top of content + vertical offset + ascender
+  let mut y := contentRect.y + verticalOffset + ascender
 
   for line in textLayout.lines do
     -- Calculate x based on alignment
@@ -63,16 +68,21 @@ def collectWrappedText (contentRect : Trellis.LayoutRect) (font : FontId)
     CollectM.emit (.fillText line.text x y font color)
     y := y + lineHeight
 
-/-- Collect render commands for single-line text (no wrapping). -/
+/-- Collect render commands for single-line text (no wrapping).
+    Text is vertically centered within the content rect. -/
 def collectSingleLineText (contentRect : Trellis.LayoutRect) (text : String)
-    (font : FontId) (color : Color) (align : TextAlign) (textWidth : Float) : CollectM Unit := do
+    (font : FontId) (color : Color) (align : TextAlign) (textWidth : Float)
+    (lineHeight : Float) : CollectM Unit := do
   -- Calculate x based on alignment
   let x := match align with
     | .left => contentRect.x
     | .center => contentRect.x + (contentRect.width - textWidth) / 2
     | .right => contentRect.x + contentRect.width - textWidth
 
-  CollectM.emit (.fillText text x contentRect.y font color)
+  -- Vertical centering with estimated ascender (0.8 * lineHeight)
+  let ascender := lineHeight * 0.8
+  let verticalOffset := (contentRect.height - lineHeight) / 2
+  CollectM.emit (.fillText text x (contentRect.y + verticalOffset + ascender) font color)
 
 /-- Collect render commands for a widget tree using computed layout positions.
     The widget should have been measured (text layouts computed) before calling this.
@@ -89,14 +99,11 @@ partial def collectWidget (w : Widget) (layouts : Trellis.LayoutResult) : Collec
   | .text _ content font color align _ textLayoutOpt =>
     match textLayoutOpt with
     | some textLayout =>
-      -- Use estimated line height (we don't have font metrics here,
-      -- so we estimate from the textLayout height / number of lines)
-      let lineHeight := if textLayout.lines.isEmpty then 16.0
-                        else textLayout.totalHeight / textLayout.lines.size.toFloat
-      collectWrappedText contentRect font color align textLayout lineHeight
+      collectWrappedText contentRect font color align textLayout
     | none =>
-      -- Fallback to single-line rendering with estimated width
-      collectSingleLineText contentRect content font color align contentRect.width
+      -- Fallback to single-line rendering with estimated dimensions
+      -- (this path shouldn't normally be hit if measureWidget was called)
+      collectSingleLineText contentRect content font color align contentRect.width 16.0
 
   | .spacer _ _ _ =>
     -- Spacers don't render anything
@@ -143,5 +150,27 @@ def collectCommandsWithSave (w : Widget) (layouts : Trellis.LayoutResult) : Arra
     CollectM.emit .save
     collectWidget w layouts
     CollectM.emit .restore
+
+/-- Collect debug border commands for all layout cells.
+    Draws a colored stroke rect around each widget's border rect.
+    Useful for debugging layout issues. -/
+partial def collectDebugBorders (w : Widget) (layouts : Trellis.LayoutResult)
+    (color : Color := ⟨0.5, 1.0, 0.5, 0.5⟩) (lineWidth : Float := 1.0) : CollectM Unit := do
+  let some computed := layouts.get w.id | return
+  let r := computed.borderRect
+  let rect : Rect := ⟨⟨r.x, r.y⟩, ⟨r.width, r.height⟩⟩
+  CollectM.emit (.strokeRect rect color lineWidth 0)
+
+  -- Recurse into children
+  for child in w.children do
+    collectDebugBorders child layouts color lineWidth
+
+/-- Collect both regular widget commands and debug borders.
+    Returns commands that render the widget with debug borders overlaid. -/
+def collectCommandsWithDebug (w : Widget) (layouts : Trellis.LayoutResult)
+    (borderColor : Color := ⟨0.5, 1.0, 0.5, 0.5⟩) : Array RenderCommand :=
+  CollectM.execute do
+    collectWidget w layouts
+    collectDebugBorders w layouts borderColor
 
 end Arbor

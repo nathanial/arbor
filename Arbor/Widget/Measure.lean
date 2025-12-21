@@ -82,7 +82,7 @@ partial def measureWidget {M : Type → Type} [Monad M] [TextMeasurer M] (w : Wi
     let gap := props.gap
     let isColumn := !props.direction.isHorizontal
     let childSizes := childNodes.map nodeContentSize
-    let (contentW, contentH) :=
+    let (rawContentW, rawContentH) :=
       if isColumn then
         let maxWidth := childSizes.foldl (fun acc (cw, _) => max acc cw) 0
         let totalHeight := childSizes.foldl (fun acc (_, ch) => acc + ch) 0
@@ -93,6 +93,10 @@ partial def measureWidget {M : Type → Type} [Monad M] [TextMeasurer M] (w : Wi
         let maxHeight := childSizes.foldl (fun acc (_, ch) => max acc ch) 0
         let gaps := if childNodes.size > 1 then gap * (childNodes.size - 1).toFloat else 0
         (totalWidth + gaps + padding.horizontal, maxHeight + padding.vertical)
+
+    -- Apply min constraints to content size so parent containers respect our minimum size
+    let contentW := max rawContentW box.minWidth
+    let contentH := max rawContentH box.minHeight
 
     let node :=
       Trellis.LayoutNode.mk id box (.flex props) .none (some (Trellis.ContentSize.mk' contentW contentH)) childNodes
@@ -126,8 +130,12 @@ partial def measureWidget {M : Type → Type} [Monad M] [TextMeasurer M] (w : Wi
 
     let totalWidth := maxColWidth * numCols.toFloat + colGap * (numCols - 1).toFloat
     let totalHeight := maxRowHeight * numRows.toFloat + rowGap * (numRows - 1).toFloat
-    let contentW := totalWidth + padding.horizontal
-    let contentH := totalHeight + padding.vertical
+    let rawContentW := totalWidth + padding.horizontal
+    let rawContentH := totalHeight + padding.vertical
+
+    -- Apply min constraints to content size so parent containers respect our minimum size
+    let contentW := max rawContentW box.minWidth
+    let contentH := max rawContentH box.minHeight
 
     let node :=
       Trellis.LayoutNode.mk id box (.grid props) .none (some (Trellis.ContentSize.mk' contentW contentH)) childNodes
@@ -190,18 +198,21 @@ partial def intrinsicSize {M : Type → Type} [Monad M] [TextMeasurer M] (w : Wi
     -- Compute intrinsic sizes of all children
     let childSizes ← children.mapM intrinsicSize
 
-    if isColumn then
+    let (rawW, rawH) := if isColumn then
       -- Column: width = max of children, height = sum of children + gaps
       let maxWidth := childSizes.foldl (fun acc (w, _) => max acc w) 0
       let totalHeight := childSizes.foldl (fun acc (_, h) => acc + h) 0
       let gaps := if children.size > 1 then gap * (children.size - 1).toFloat else 0
-      pure (maxWidth + padding.horizontal, totalHeight + gaps + padding.vertical)
+      (maxWidth + padding.horizontal, totalHeight + gaps + padding.vertical)
     else
       -- Row: width = sum of children + gaps, height = max of children
       let totalWidth := childSizes.foldl (fun acc (w, _) => acc + w) 0
       let maxHeight := childSizes.foldl (fun acc (_, h) => max acc h) 0
       let gaps := if children.size > 1 then gap * (children.size - 1).toFloat else 0
-      pure (totalWidth + gaps + padding.horizontal, maxHeight + padding.vertical)
+      (totalWidth + gaps + padding.horizontal, maxHeight + padding.vertical)
+
+    -- Apply min constraints
+    pure (max rawW (style.minWidth.getD 0), max rawH (style.minHeight.getD 0))
 
   | .grid _ props style children =>
     let padding := style.padding
@@ -224,7 +235,11 @@ partial def intrinsicSize {M : Type → Type} [Monad M] [TextMeasurer M] (w : Wi
 
     let totalWidth := maxColWidth * numCols.toFloat + colGap * (numCols - 1).toFloat
     let totalHeight := maxRowHeight * numRows.toFloat + rowGap * (numRows - 1).toFloat
-    pure (totalWidth + padding.horizontal, totalHeight + padding.vertical)
+    let rawW := totalWidth + padding.horizontal
+    let rawH := totalHeight + padding.vertical
+
+    -- Apply min constraints
+    pure (max rawW (style.minWidth.getD 0), max rawH (style.minHeight.getD 0))
 
   | .scroll _ style _ contentW contentH _ =>
     -- Scroll containers use their viewport size (from style) or content size
