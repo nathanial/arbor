@@ -36,6 +36,12 @@ inductive RenderCommand where
   | fillTextBlock (text : String) (rect : Rect) (font : FontId) (color : Color)
                   (align : TextAlign) (valign : TextVAlign)
 
+  /-- Fill a convex polygon with a solid color. -/
+  | fillPolygon (points : Array Point) (color : Color)
+
+  /-- Stroke a convex polygon outline. -/
+  | strokePolygon (points : Array Point) (color : Color) (lineWidth : Float)
+
   /-- Push a clipping rectangle onto the clip stack. -/
   | pushClip (rect : Rect)
 
@@ -68,6 +74,14 @@ def stroke (x y w h : Float) (color : Color) (lineWidth : Float) (radius : Float
 /-- Create a text command. -/
 def text (s : String) (x y : Float) (font : FontId) (color : Color) : RenderCommand :=
   .fillText s x y font color
+
+/-- Create a filled polygon command. -/
+def fillPoly (points : Array Point) (color : Color) : RenderCommand :=
+  .fillPolygon points color
+
+/-- Create a stroked polygon command. -/
+def strokePoly (points : Array Point) (color : Color) (lineWidth : Float := 1.0) : RenderCommand :=
+  .strokePolygon points color lineWidth
 
 end RenderCommand
 

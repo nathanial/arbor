@@ -67,6 +67,14 @@ partial def measureWidget {M : Type → Type} [Monad M] [TextMeasurer M] (w : Wi
     let node := Trellis.LayoutNode.leaf id ⟨width, height⟩
     pure ⟨node, w⟩
 
+  | .custom id _ style spec =>
+    let box := styleToBoxConstraints style
+    let (measuredW, measuredH) := spec.measure availWidth availHeight
+    let contentW := max measuredW box.minWidth
+    let contentH := max measuredH box.minHeight
+    let node := Trellis.LayoutNode.leaf id ⟨contentW, contentH⟩ box
+    pure ⟨node, w⟩
+
   | .flex id name props style children =>
     let box := styleToBoxConstraints style
     -- Recursively measure children
@@ -189,6 +197,12 @@ partial def intrinsicSize {M : Type → Type} [Monad M] [TextMeasurer M] (w : Wi
 
   | .spacer _ _ w h =>
     pure (w, h)
+
+  | .custom _ _ style spec =>
+    let (measuredW, measuredH) := spec.measure 1000000000.0 1000000000.0
+    let contentW := max measuredW (style.minWidth.getD 0)
+    let contentH := max measuredH (style.minHeight.getD 0)
+    pure (contentW, contentH)
 
   | .flex _ _ props style children =>
     let padding := style.padding

@@ -131,6 +131,39 @@ def executeCommand (state : RenderState) (cmd : RenderCommand) : RenderState :=
       | .right => state.canvas.drawTextRight x y w text
     { state with canvas }
 
+  | .fillPolygon points color =>
+    if points.isEmpty then
+      state
+    else
+      let (minX, minY, maxX, maxY) :=
+        points.foldl
+          (fun (minX, minY, maxX, maxY) p =>
+            (min minX p.x, min minY p.y, max maxX p.x, max maxY p.y))
+          (points[0]!.x, points[0]!.y, points[0]!.x, points[0]!.y)
+      let rect := Rect.mk' minX minY (maxX - minX) (maxY - minY)
+      let (x, y) := state.toCanvasCoords rect.x rect.y
+      let w := rect.width.toUInt32.toNat
+      let h := rect.height.toUInt32.toNat
+      let ch := colorToFillChar color
+      let canvas := state.canvas.fillRect x y w h ch
+      { state with canvas }
+
+  | .strokePolygon points _color _lineWidth =>
+    if points.isEmpty then
+      state
+    else
+      let (minX, minY, maxX, maxY) :=
+        points.foldl
+          (fun (minX, minY, maxX, maxY) p =>
+            (min minX p.x, min minY p.y, max maxX p.x, max maxY p.y))
+          (points[0]!.x, points[0]!.y, points[0]!.x, points[0]!.y)
+      let rect := Rect.mk' minX minY (maxX - minX) (maxY - minY)
+      let (x, y) := state.toCanvasCoords rect.x rect.y
+      let w := rect.width.toUInt32.toNat
+      let h := rect.height.toUInt32.toNat
+      let canvas := state.canvas.strokeBox x y w h Canvas.BoxChars.single
+      { state with canvas }
+
   | .pushClip rect =>
     state.pushClip rect
 
@@ -387,6 +420,8 @@ partial def collectWidgetInfo (w : Widget) (layouts : Trellis.LayoutResult)
         ("scroll", none, none, some (formatStyle style), 1)
     | .spacer _ _ width height =>
         ("spacer", some s!"{width.toUInt32}x{height.toUInt32}", none, none, 0)
+    | .custom _ _ style _ =>
+        ("custom", none, none, some (formatStyle style), 0)
 
   let info : WidgetInfo := {
     id := w.id

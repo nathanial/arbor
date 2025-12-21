@@ -79,6 +79,24 @@ def card (bg : Color) (p : Float) : BoxStyle :=
 
 end BoxStyle
 
+/-- Custom widget specification.
+    Provides measurement and render command collection. -/
+structure CustomSpec where
+  /-- Measure intrinsic content size given available width/height. -/
+  measure : Float → Float → (Float × Float)
+  /-- Collect render commands given computed layout. -/
+  collect : Trellis.ComputedLayout → RenderCommands
+
+namespace CustomSpec
+
+def default : CustomSpec :=
+  { measure := fun _ _ => (0, 0)
+    collect := fun _ => #[] }
+
+end CustomSpec
+
+instance : Inhabited CustomSpec := ⟨CustomSpec.default⟩
+
 /-- Core widget type - declarative, display-only.
     Uses FontId instead of concrete Font type for renderer independence.
     Each widget has an optional `name` for debug/semantic identification. -/
@@ -127,6 +145,12 @@ inductive Widget where
            (width : Float)
            (height : Float)
 
+  /-- Custom widget with user-provided measurement and rendering. -/
+  | custom (id : WidgetId)
+           (name : Option String := none)
+           (style : BoxStyle)
+           (spec : CustomSpec)
+
 deriving Inhabited
 
 namespace Widget
@@ -139,6 +163,7 @@ def id : Widget → WidgetId
   | .rect id .. => id
   | .scroll id .. => id
   | .spacer id .. => id
+  | .custom id .. => id
 
 /-- Get the widget's optional name for debug identification. -/
 def name? : Widget → Option String
@@ -148,6 +173,7 @@ def name? : Widget → Option String
   | .rect _ name .. => name
   | .scroll _ name .. => name
   | .spacer _ name .. => name
+  | .custom _ name .. => name
 
 /-- Get the widget's children (empty for leaf widgets). -/
 def children : Widget → Array Widget
@@ -162,6 +188,7 @@ def style? : Widget → Option BoxStyle
   | .grid _ _ _ style _ => some style
   | .rect _ _ style => some style
   | .scroll _ _ style .. => some style
+  | .custom _ _ style _ => some style
   | _ => none
 
 /-- Check if this widget is a container. -/

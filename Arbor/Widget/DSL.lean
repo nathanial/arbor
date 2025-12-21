@@ -67,6 +67,16 @@ def namedColoredBox (name : String) (color : Color) (width height : Float) : Wid
   let wid ← freshId
   pure (.rect wid (some name) { backgroundColor := some color, minWidth := some width, minHeight := some height })
 
+/-- Create a custom widget with a rendering spec. -/
+def custom (spec : CustomSpec) (style : BoxStyle := {}) : WidgetBuilder := do
+  let wid ← freshId
+  pure (.custom wid none style spec)
+
+/-- Create a named custom widget with a rendering spec. -/
+def namedCustom (name : String) (spec : CustomSpec) (style : BoxStyle := {}) : WidgetBuilder := do
+  let wid ← freshId
+  pure (.custom wid (some name) style spec)
+
 /-- Create a spacer with fixed dimensions. -/
 def spacer (width height : Float) : WidgetBuilder := do
   let wid ← freshId

@@ -109,6 +109,10 @@ partial def collectWidget (w : Widget) (layouts : Trellis.LayoutResult) : Collec
     -- Spacers don't render anything
     pure ()
 
+  | .custom _ _ style spec =>
+    collectBoxStyle borderRect style
+    CollectM.emitAll (spec.collect computed)
+
   | .flex _ _ _ style children =>
     collectBoxStyle borderRect style
     for child in children do
