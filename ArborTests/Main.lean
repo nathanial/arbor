@@ -307,4 +307,4 @@ test "debugLayout shows labeled boxes" := do
 end ArborTests
 
 def main : IO UInt32 := do
-  Crucible.runTests "Arbor Tests" ArborTests.cases
+  runAllSuites
