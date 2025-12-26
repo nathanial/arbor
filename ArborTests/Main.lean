@@ -5,15 +5,13 @@
 import Arbor
 import Crucible
 import Trellis
+import Staple
 
 namespace ArborTests
 
 open Crucible
 open Arbor
-
-/-- Check if a string contains a substring. -/
-def containsSubstr (haystack needle : String) : Bool :=
-  (haystack.splitOn needle).length > 1
+open Staple (String.containsSubstr)
 
 /-! ## Core Types Tests -/
 
@@ -256,35 +254,35 @@ test "renderToAscii with fillRect" := do
   ]
   let output := Text.renderToAscii cmds 10 5
   -- Dark color should produce dense block chars
-  ensure (containsSubstr output "█" || output.length > 0) "Should render something"
+  ensure (String.containsSubstr output "█" || output.length > 0) "Should render something"
 
 test "renderToAscii with strokeRect" := do
   let cmds : Array RenderCommand := #[
     .strokeRect (Rect.mk' 0 0 5 3) Tincture.Color.white 1 0
   ]
   let output := Text.renderToAscii cmds 10 5
-  ensure (containsSubstr output "┌") "Should have top-left corner"
-  ensure (containsSubstr output "┘") "Should have bottom-right corner"
+  ensure (String.containsSubstr output "┌") "Should have top-left corner"
+  ensure (String.containsSubstr output "┘") "Should have bottom-right corner"
 
 test "renderToAscii with fillText" := do
   let cmds : Array RenderCommand := #[
     .fillText "Hello" 0 0 FontId.default Tincture.Color.white
   ]
   let output := Text.renderToAscii cmds 20 5
-  ensure (containsSubstr output "Hello") "Should contain text"
+  ensure (String.containsSubstr output "Hello") "Should contain text"
 
 test "renderToAscii with rounded corners" := do
   let cmds : Array RenderCommand := #[
     .strokeRect (Rect.mk' 0 0 6 4) Tincture.Color.white 1 5
   ]
   let output := Text.renderToAscii cmds 10 5
-  ensure (containsSubstr output "╭") "Should have rounded top-left"
-  ensure (containsSubstr output "╯") "Should have rounded bottom-right"
+  ensure (String.containsSubstr output "╭") "Should have rounded top-left"
+  ensure (String.containsSubstr output "╯") "Should have rounded bottom-right"
 
 test "renderWithBorder adds title" := do
   let cmds : Array RenderCommand := #[]
   let output := Text.renderWithBorder cmds 20 5 "Test"
-  ensure (containsSubstr output "Test") "Should contain title"
+  ensure (String.containsSubstr output "Test") "Should contain title"
 
 test "RenderState translation" := do
   let state := Text.RenderState.create 20 10
@@ -299,8 +297,8 @@ test "debugLayout shows labeled boxes" := do
     ("Box2", Rect.mk' 12 0 8 4)
   ]
   let output := Text.debugLayout boxes 25 6
-  ensure (containsSubstr output "Box1") "Should contain Box1 label"
-  ensure (containsSubstr output "Box2") "Should contain Box2 label"
+  ensure (String.containsSubstr output "Box1") "Should contain Box1 label"
+  ensure (String.containsSubstr output "Box2") "Should contain Box2 label"
 
 #generate_tests
 

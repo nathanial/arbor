@@ -13,6 +13,7 @@ require tincture from ".." / "tincture"
 
 -- Test dependencies
 require crucible from ".." / "crucible"
+require staple from ".." / "staple"
 
 @[default_target]
 lean_lib Arbor where
