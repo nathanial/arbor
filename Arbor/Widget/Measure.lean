@@ -60,11 +60,11 @@ partial def measureWidget {M : Type → Type} [Monad M] [TextMeasurer M] (w : Wi
     let box := styleToBoxConstraints style
     let contentW := style.minWidth.getD 0
     let contentH := style.minHeight.getD 0
-    let node := Trellis.LayoutNode.leaf id ⟨contentW, contentH⟩ box
+    let node := Trellis.LayoutNode.leaf id (Trellis.ContentSize.mk' contentW contentH) box
     pure ⟨node, w⟩
 
   | .spacer id _ width height =>
-    let node := Trellis.LayoutNode.leaf id ⟨width, height⟩
+    let node := Trellis.LayoutNode.leaf id (Trellis.ContentSize.mk' width height)
     pure ⟨node, w⟩
 
   | .custom id _ style spec =>
@@ -72,7 +72,7 @@ partial def measureWidget {M : Type → Type} [Monad M] [TextMeasurer M] (w : Wi
     let (measuredW, measuredH) := spec.measure availWidth availHeight
     let contentW := max measuredW box.minWidth
     let contentH := max measuredH box.minHeight
-    let node := Trellis.LayoutNode.leaf id ⟨contentW, contentH⟩ box
+    let node := Trellis.LayoutNode.leaf id (Trellis.ContentSize.mk' contentW contentH) box
     pure ⟨node, w⟩
 
   | .flex id name props style children =>

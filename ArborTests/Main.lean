@@ -175,7 +175,7 @@ testSuite "Render.Collect"
 
 test "collectCommands generates commands for spacer" := do
   let widget := Widget.spacer 0 none 100 50
-  let node := Trellis.LayoutNode.leaf 0 ⟨100, 50⟩
+  let node := Trellis.LayoutNode.leaf 0 (Trellis.ContentSize.mk' 100 50)
   let layouts := Trellis.layout node 100 50
   let cmds := collectCommands widget layouts
   -- Spacer generates no commands
@@ -184,7 +184,7 @@ test "collectCommands generates commands for spacer" := do
 test "collectCommands generates commands for colored rect" := do
   let style : BoxStyle := { backgroundColor := some Tincture.Color.red }
   let widget := Widget.rect 0 none style
-  let node := Trellis.LayoutNode.leaf 0 ⟨100, 50⟩
+  let node := Trellis.LayoutNode.leaf 0 (Trellis.ContentSize.mk' 100 50)
   let layouts := Trellis.layout node 100 50
   let cmds := collectCommands widget layouts
   cmds.size ≡ 1
