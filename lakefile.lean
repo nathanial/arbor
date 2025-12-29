@@ -8,12 +8,12 @@ package arbor where
   ]
 
 -- Core dependencies
-require trellis from ".." / "trellis"
-require tincture from ".." / "tincture"
+require trellis from git "https://github.com/nathanial/trellis" @ "v0.0.1"
+require tincture from git "https://github.com/nathanial/tincture" @ "v0.0.1"
 
 -- Test dependencies
-require crucible from ".." / "crucible"
-require staple from ".." / "staple"
+require crucible from git "https://github.com/nathanial/crucible" @ "v0.0.1"
+require staple from git "https://github.com/nathanial/staple" @ "v0.0.1"
 
 @[default_target]
 lean_lib Arbor where
