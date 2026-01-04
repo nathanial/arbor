@@ -3,6 +3,7 @@
   Abstract rendering commands that can be interpreted by different backends.
 -/
 import Arbor.Core.Types
+import Arbor.Core.Path
 
 namespace Arbor
 
@@ -41,6 +42,12 @@ inductive RenderCommand where
 
   /-- Stroke a convex polygon outline. -/
   | strokePolygon (points : Array Point) (color : Color) (lineWidth : Float)
+
+  /-- Fill a path with a solid color. -/
+  | fillPath (path : Path) (color : Color)
+
+  /-- Stroke a path outline. -/
+  | strokePath (path : Path) (color : Color) (lineWidth : Float)
 
   /-- Push a clipping rectangle onto the clip stack. -/
   | pushClip (rect : Rect)

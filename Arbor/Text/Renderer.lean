@@ -164,6 +164,14 @@ def executeCommand (state : RenderState) (cmd : RenderCommand) : RenderState :=
       let canvas := state.canvas.strokeBox x y w h Canvas.BoxChars.single
       { state with canvas }
 
+  | .fillPath _path _color =>
+    -- Path rendering not supported in text mode
+    state
+
+  | .strokePath _path _color _lineWidth =>
+    -- Path rendering not supported in text mode
+    state
+
   | .pushClip rect =>
     state.pushClip rect
 
