@@ -179,8 +179,8 @@ def arcToBeziers (center : Point) (radius : Float) (startAngle endAngle : Float)
 
   for _ in [:numSegments] do
     let endAng := start + segmentSweep
-    let halfSweep := segmentSweep / 2.0
-    let k := 4.0 / 3.0 * Float.tan halfSweep
+    let quarterSweep := segmentSweep / 4.0
+    let k := 4.0 / 3.0 * Float.tan quarterSweep
 
     let cosStart := Float.cos start
     let sinStart := Float.sin start
